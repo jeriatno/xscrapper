@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "Google Maps Scraper",
+  "name": "XMaps Scraper",
   "version": "1.0.0",
   "description": "Scrape leads (Nama, Rating, Ulasan, Alamat, Telepon, Website) dari Google Maps & Export ke CSV.",
   "permissions": [

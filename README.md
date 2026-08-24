@@ -1,6 +1,9 @@
-# Google Maps Scraper (Chrome Extension - Manifest V3)
-
-A lightweight and powerful **Manifest V3** Google Chrome Extension designed to automatically extract business leads from Google Maps search results and export them directly to a **CSV** file.
+<div align="center">
+  <img src="icons/icon128.png" alt="Google Maps Scraper Logo" width="96" height="96" />
+  <h1>XMaps Scraper</h1>
+  <p><strong>Chrome Extension (Manifest V3)</strong></p>
+  <p>A lightweight and powerful Google Chrome Extension designed to automatically extract business leads from Google Maps search results and export them directly to a <strong>CSV</strong> file.</p>
+</div>
 
 ---
 
