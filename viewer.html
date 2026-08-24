@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Google Maps Scraped Leads Viewer</title>
+  <link rel="icon" type="image/png" href="icons/icon32.png">
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #131b2e;
+      --card-border: #23304a;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --success: #10b981;
+      --success-hover: #059669;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --row-hover: #1c2742;
+      --badge-bg: #1e3a8a;
+      --badge-text: #93c5fd;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 24px 32px;
+      min-height: 100vh;
+    }
+
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--card-border);
+    }
+
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .title-group h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #60a5fa;
+    }
+
+    .badge {
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--badge-bg);
+      color: var(--badge-text);
+      padding: 4px 10px;
+      border-radius: 9999px;
+    }
+
+    .controls-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex: 1;
+      max-width: 400px;
+      position: relative;
+    }
+
+    .search-box input {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 10px 16px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--primary);
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-export {
+      background: var(--success);
+      color: #fff;
+    }
+
+    .btn-export:hover {
+      background: var(--success-hover);
+    }
+
+    .table-container {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      overflow-x: auto;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 13px;
+    }
+
+    th {
+      background: #172138;
+      padding: 14px 16px;
+      color: #cbd5e1;
+      font-weight: 600;
+      border-bottom: 1px solid var(--card-border);
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--card-border);
+      color: var(--text);
+      vertical-align: middle;
+    }
+
+    tr:hover td {
+      background-color: var(--row-hover);
+    }
+
+    .rating-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #78350f;
+      color: #fde047;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-weight: 600;
+      font-size: 12px;
+    }
+
+    .reviews-badge {
+      color: var(--text-muted);
+      font-size: 11px;
+      margin-left: 4px;
+    }
+
+    a.link {
+      color: #60a5fa;
+      text-decoration: none;
+      word-break: break-all;
+    }
+
+    a.link:hover {
+      text-decoration: underline;
+    }
+
+    .empty-state {
+      padding: 48px 16px;
+      text-align: center;
+      color: var(--text-muted);
+    }
+
+    .empty-state p {
+      margin-top: 8px;
+      font-size: 14px;
+    }
+
+    .copy-btn {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+
+    .copy-btn:hover {
+      background: #1e293b;
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="top-nav">
+    <div class="title-group">
+      <img src="icons/icon48.png" alt="Logo" width="32" height="32" style="border-radius: 6px;">
+      <h1>Google Maps Scraped Leads</h1>
+      <span class="badge" id="totalCountBadge">0 Leads</span>
+    </div>
+    <div class="actions">
+      <button id="btnDownloadCsv" class="btn-export">📥 Export to CSV</button>
+    </div>
+  </div>
+
+  <div class="controls-bar">
+    <div class="search-box">
+      <input type="text" id="searchInput" placeholder="🔍 Search by name, address, phone, category...">
+    </div>
+  </div>
+
+  <div class="table-container">
+    <table id="leadsTable">
+      <thead>
+        <tr>
+          <th style="width: 40px;">#</th>
+          <th>Nama Tempat / Business</th>
+          <th>Rating & Reviews</th>
+          <th>Alamat</th>
+          <th>Nomor Telepon</th>
+          <th>Website</th>
+          <th>Maps Link</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody">
+        <tr>
+          <td colspan="7" class="empty-state">
+            Memuat data...
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <script src="viewer.js"></script>
+</body>
+</html>
