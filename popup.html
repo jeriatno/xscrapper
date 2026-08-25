@@ -174,22 +174,13 @@
       background: var(--danger-hover);
     }
 
-    .btn-secondary {
-      background: #475569;
+    .btn-view {
+      background: #0284c7;
       color: #fff;
     }
 
-    .btn-secondary:hover:not(:disabled) {
-      background: #334155;
-    }
-
-    .btn-success {
-      background: var(--success);
-      color: #fff;
-    }
-
-    .btn-success:hover:not(:disabled) {
-      background: var(--success-hover);
+    .btn-view:hover:not(:disabled) {
+      background: #0369a1;
     }
   </style>
 </head>
@@ -197,7 +188,7 @@
   <div class="header">
     <div style="display: flex; align-items: center; gap: 8px;">
       <img src="icons/icon32.png" alt="Logo" width="22" height="22" style="border-radius: 4px;">
-      <h1>Maps Scraper</h1>
+      <h1>XMaps Scraper</h1>
     </div>
     <span class="badge">MV3</span>
   </div>
@@ -225,8 +216,7 @@
   <div class="btn-group">
     <button id="btnStart" class="btn-primary">▶ Mulai Scraping</button>
     <button id="btnStop" class="btn-danger" style="display: none;">⏹ Berhenti</button>
-    <button id="btnView" class="btn-secondary" disabled>👁️ Buka Data di Browser</button>
-    <button id="btnExport" class="btn-success" disabled>📥 Export ke CSV</button>
+    <button id="btnView" class="btn-view" disabled>👁️ Buka Data di Browser</button>
   </div>
 
   <script src="popup.js"></script>

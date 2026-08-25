@@ -3,10 +3,10 @@ let scrapedLeads = [];
 let maxResultsLimit = 50;
 let stopRequested = false;
 
-// Helper delay
+// Helper delay utility
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Cari container feed Google Maps
+// Find the Google Maps search results feed container
 function getFeedContainer() {
   return (
     document.querySelector('div[role="feed"]') ||
@@ -16,19 +16,19 @@ function getFeedContainer() {
   );
 }
 
-// Ekstraksi data dari satu kartu listing
+// Extract lead data from an individual listing card
 function parseItemCard(card) {
-  // Link & URL Maps
+  // Maps link and Place URL
   const linkEl = card.querySelector('a.hfpxzc') || card.querySelector('a[href*="/maps/place/"]');
   const url = linkEl ? linkEl.href : '';
 
-  // Nama Tempat
+  // Place / Business Name
   const titleEl = card.querySelector('.qBF1Pd') || card.querySelector('div.fontHeadlineSmall');
   const title = titleEl ? titleEl.textContent.trim() : (linkEl ? linkEl.getAttribute('aria-label') || '' : '');
 
   if (!title) return null;
 
-  // Rating
+  // Rating score
   let rating = '';
   const ratingEl = card.querySelector('.MW4etd') || card.querySelector('span[aria-label*="stars"], span[aria-label*="bintang"]');
   if (ratingEl) {
@@ -37,7 +37,7 @@ function parseItemCard(card) {
     if (rMatch) rating = rMatch[1].replace(',', '.');
   }
 
-  // Jumlah Ulasan
+  // Review count
   let reviewCount = '';
   const reviewEl = card.querySelector('.UY7F9') || card.querySelector('span[aria-label*="reviews"], span[aria-label*="ulasan"]');
   if (reviewEl) {
@@ -46,56 +46,144 @@ function parseItemCard(card) {
     if (revMatch) reviewCount = revMatch[1].replace(/[.,]/g, '');
   }
 
-  // Website Link
+  // Official Website Link
   let website = '';
   const websiteEl = card.querySelector('a[data-value="Website"], a[aria-label*="Website"], a[aria-label*="Situs Web"], a[aria-label*="situs web"]');
   if (websiteEl && websiteEl.href) {
     website = websiteEl.href;
   }
 
-  // Baris Info Tambahan (Kategori, Alamat, Nomor Telepon)
+  // Additional info lines (Category, Price, Status, Address, Phone, Services, Review Snippet)
+  let category = '';
+  let price = '';
+  let status = '';
   let address = '';
   let phone = '';
+  let services = '';
+  let reviewSnippet = '';
 
-  const infoContainers = card.querySelectorAll('.W4Efsd');
-  const phoneRegex = /(\+?\d{1,4}[-.\s]?)?(\(?\d{2,5}\)?[-.\s]?)?\d{3,5}[-.\s]?\d{3,5}/;
+  const infoContainers = Array.from(card.querySelectorAll('.W4Efsd'));
+  const phoneRegex = /(\+?\d{1,4}[\s-]?)?(\(?\d{2,5}\)?[\s-]?)?\d{3,5}[\s-]?\d{3,5}/;
+  const statusRegex = /(buka|tutup|open|closed|operational|hours|pukul|jam|\b24\s*(jam|hours)\b|\d{1,2}[:.]\d{2})/i;
+  const serviceRegex = /(makan di tempat|dine-in|bawa pulang|takeaway|takeout|pesan antar|delivery|drive-thru|outdoor|indoor|servis di lokasi)/i;
+  const priceRegex = /^([$€£¥₹]|Rp\s*[\d.,\-kK]+|\$\$+|\$\$\$+)+$/i;
 
-  infoContainers.forEach((container) => {
-    const text = container.textContent.trim();
-    if (!text) return;
+  // Helper to extract clean text tokens from leaf nodes to prevent merging adjacent spans
+  function getContainerTokens(container) {
+    const leafSpans = Array.from(container.querySelectorAll('span')).filter(
+      (s) => s.children.length === 0 && s.textContent.trim().length > 0
+    );
 
-    // Deteksi nomor telepon
-    const phoneMatch = text.match(phoneRegex);
-    if (phoneMatch && phoneMatch[0].length >= 8 && !phone) {
-      phone = phoneMatch[0].trim();
+    let rawTokens = [];
+    if (leafSpans.length > 0) {
+      rawTokens = leafSpans.map((s) => s.textContent.trim());
+    } else {
+      rawTokens = [container.textContent.trim()];
     }
 
-    // Bagian teks terpisah oleh bullet '·'
-    const parts = text.split('·').map((p) => p.trim());
-    parts.forEach((part) => {
-      // Jika bukan rating, bukan nomor telepon, dan bukan kata buka/tutup
-      const isStatus = /Buka|Tutup|Open|Closed|24 Jam|24 hours/i.test(part);
-      const isReviewPart = /^\(?\d+\)?$/.test(part);
-      const isPhonePart = phoneMatch && part.includes(phoneMatch[0]);
+    const tokens = [];
+    rawTokens.forEach((tok) => {
+      tok.split(/[·⋅•|\n]/).forEach((sub) => {
+        const clean = sub.trim();
+        if (clean && clean !== '·' && clean !== '⋅' && clean !== '•' && clean !== '|') {
+          tokens.push(clean);
+        }
+      });
+    });
 
-      if (!isStatus && !isReviewPart && !isPhonePart && part.length > 5 && !address) {
-        address = part;
+    return tokens;
+  }
+
+  function isRatingOrReviewToken(text) {
+    if (!text) return false;
+    // Matches patterns like "5,0", "5.0", "(10)", "5,0(10)", "4.8 (1,234)", "(1.2k)", or purely numbers and parentheses
+    const pattern = /^\s*(\d+[.,]\d+)?\s*\(?[\d.,kK]+\)?\s*$/;
+    const pureNumbersAndParens = /^[\d.,\s\(\)]+$/;
+    return pattern.test(text) || pureNumbersAndParens.test(text);
+  }
+
+  infoContainers.forEach((container, containerIdx) => {
+    // Check for customer review quote snippet
+    const quoteEl = container.querySelector('span[jscontroller] span, .ah5Ghc');
+    if (quoteEl && (quoteEl.textContent.startsWith('"') || quoteEl.textContent.startsWith('“'))) {
+      reviewSnippet = quoteEl.textContent.replace(/^[“"]|[”"]$/g, '').trim();
+    }
+
+    const tokens = getContainerTokens(container);
+    const serviceParts = [];
+    const statusParts = [];
+
+    tokens.forEach((token) => {
+      // 1. Phone number check
+      const phoneMatch = token.match(phoneRegex);
+      if (phoneMatch && phoneMatch[0].replace(/\D/g, '').length >= 7 && !phone) {
+        phone = phoneMatch[0].trim();
+        return;
+      }
+
+      // 2. Price tier check
+      if (priceRegex.test(token) || /^(Rp\s*\d+|[$€£¥]{1,4})/i.test(token)) {
+        if (!price) price = token;
+        return;
+      }
+
+      // 3. Service options check (Dine-in, Takeout, Delivery, etc.)
+      if (serviceRegex.test(token)) {
+        serviceParts.push(token);
+        return;
+      }
+
+      // 4. Operational status check (Open, Closed, Hours)
+      if (statusRegex.test(token)) {
+        statusParts.push(token);
+        return;
+      }
+
+      // 5. Skip rating, review count, or quote fragments
+      if (isRatingOrReviewToken(token)) return;
+      if (token.startsWith('"') || token.startsWith('“') || token.startsWith('”')) {
+        if (!reviewSnippet) reviewSnippet = token.replace(/^[“"]|[”"]$/g, '').trim();
+        return;
+      }
+
+      // 6. In the first line with rating, non-rating text is the Category
+      if (containerIdx === 0 && !category) {
+        category = token;
+        return;
+      }
+
+      // 7. In subsequent lines (or fallback), remaining descriptive text is the Address
+      if (!address && token !== category && token.length > 2) {
+        address = token;
       }
     });
+
+    if (serviceParts.length > 0 && !services) {
+      services = serviceParts.join(' · ');
+    }
+
+    if (statusParts.length > 0 && !status) {
+      status = statusParts.join(' ⋅ ');
+    }
   });
 
   return {
     title,
+    category,
     rating,
     reviewCount,
+    price,
+    status,
     address,
     phone,
+    services,
+    reviewSnippet,
     website,
     url
   };
 }
 
-// Logika scraping utama dengan auto-scroll
+// Main scraping routine with automated infinite scrolling
 async function runScraper(maxResults) {
   isScraping = true;
   stopRequested = false;
@@ -107,7 +195,7 @@ async function runScraper(maxResults) {
     isScraping = false;
     chrome.runtime.sendMessage({
       action: 'SCRAPING_ERROR',
-      error: 'Daftar hasil tidak ditemukan. Lakukan pencarian di Google Maps terlebih dahulu.'
+      error: 'Results feed not found. Please execute a search on Google Maps first.'
     });
     return;
   }
@@ -118,7 +206,7 @@ async function runScraper(maxResults) {
   let lastItemCount = 0;
 
   while (isScraping && !stopRequested && scrapedLeads.length < maxResultsLimit) {
-    // Ambil semua elemen kartu hasil
+    // Query all listing card elements in the feed
     const cards = feed.querySelectorAll('.Nv2PK, div[role="article"]');
 
     cards.forEach((card) => {
@@ -142,27 +230,27 @@ async function runScraper(maxResults) {
 
     if (scrapedLeads.length >= maxResultsLimit || stopRequested) break;
 
-    // Cek apakah sudah mencapai akhir daftar
+    // Check if the end of the results list has been reached
     const endReached = document.querySelector('.HlvSq') || document.querySelector('span.PbZDve');
     if (endReached && endReached.textContent.includes('end of the list')) {
       break;
     }
 
-    // Auto-scroll ke bawah
+    // Auto-scroll down
     feed.scrollTop = feed.scrollHeight;
     await sleep(1500);
 
-    // Cek apakah ada data baru setelah scroll
+    // Check if new items loaded after scrolling
     if (cards.length === lastItemCount) {
       scrollAttempts++;
-      // Sedikit scroll ke atas lalu ke bawah lagi untuk memicu loading
+      // Scroll slightly up and down again to trigger lazy loading
       feed.scrollTop -= 200;
       await sleep(400);
       feed.scrollTop = feed.scrollHeight;
       await sleep(1000);
 
       if (scrollAttempts >= maxScrollAttemptsWithoutNew) {
-        break; // Tidak ada hasil baru yang dimuat
+        break; // No further items loaded
       }
     } else {
       scrollAttempts = 0;
@@ -180,7 +268,7 @@ async function runScraper(maxResults) {
   });
 }
 
-// Listener pesan dari popup
+// Runtime message listener for popup commands
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'START_SCRAPING') {
     if (!isScraping) {
@@ -197,7 +285,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     sendResponse({
       isScraping: isScraping,
       data: scrapedLeads,
-      statusMessage: isScraping ? 'Sedang mengekstrak data...' : (scrapedLeads.length > 0 ? `Tersedia ${scrapedLeads.length} data.` : 'Siap.')
+      statusMessage: isScraping
+        ? 'Extracting leads...'
+        : (scrapedLeads.length > 0 ? `${scrapedLeads.length} leads extracted.` : 'Ready.')
     });
   }
   return true;
